@@ -22,6 +22,15 @@ DROP FUNCTION IF EXISTS get_student_gpa();
 DROP FUNCTION IF EXISTS update_cumulative_gpa();
 DROP FUNCTION IF EXISTS create_course_and_assign_professor();
 DROP FUNCTION IF EXISTS create_exam_and_check_conflict();
+
+DROP TRIGGER IF EXISTS trg_check_student_user_type ON Student;
+DROP TRIGGER IF EXISTS trg_check_instructor_user_type ON Instructor;
+DROP TRIGGER IF EXISTS trg_after_exam_grades_insert ON Exam_grades;
+
+DROP FUNCTION IF EXISTS check_student_user_type();
+DROP FUNCTION IF EXISTS check_instructor_user_type();
+DROP FUNCTION IF EXISTS after_exam_grades_insert();
+
 	
 --Update and View Syllabus
 
@@ -880,3 +889,92 @@ BEGIN
     END IF;
 END;
 $$ LANGUAGE plpgsql;
+
+
+------------------Triggers-----------------------------------------------------------------------------
+
+CREATE OR REPLACE FUNCTION check_student_user_type()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Check if the user_type of the corresponding user_id is 'student'
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM Users
+        WHERE user_id = NEW.student_id AND user_type = 'student'
+    ) THEN
+        RAISE EXCEPTION 'Cannot insert into Student. User_id % is not a student.', NEW.student_id;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION check_instructor_user_type()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- Check if the user_type of the corresponding user_id is 'instructor'
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM Users
+        WHERE user_id = NEW.instructor_id AND user_type = 'instructor'
+    ) THEN
+        RAISE EXCEPTION 'Cannot insert into Instructor. User_id % is not an instructor.', NEW.instructor_id;
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE OR REPLACE FUNCTION after_exam_grades_insert()
+RETURNS TRIGGER AS $$
+DECLARE
+    p_course_id VARCHAR(255);
+    p_section_id INT;
+    p_semester VARCHAR(255);
+    p_offered_year INT;
+BEGIN
+
+
+	SELECT course_id
+	INTO p_course_id
+	FROM Exam
+	INNER JOIN Exam_grades on Exam.exam_id = Exam_grades.exam_id
+	WHERE Exam_grades.student_id = NEW.student_id and Exam_grades.exam_id = NEW.exam_id;
+
+    SELECT e.section_id, e.semester, e.offered_year
+    INTO p_section_id, p_semester, p_offered_year
+    FROM Enrolls e
+    WHERE e.student_id = NEW.student_id and e.course_id = p_course_id;
+
+
+    -- Update final grades for the course
+    PERFORM update_final_grades_by_course(
+        p_course_id,
+        p_section_id,
+        p_semester,
+        p_offered_year
+    );
+
+    -- Update cumulative GPA for the student
+    PERFORM update_cumulative_gpa(NEW.student_id);
+
+    RETURN NEW;
+	END;
+$$ LANGUAGE plpgsql;
+
+
+CREATE TRIGGER trg_check_student_user_type
+BEFORE INSERT OR UPDATE ON Student
+FOR EACH ROW
+EXECUTE FUNCTION check_student_user_type();
+
+CREATE TRIGGER trg_check_instructor_user_type
+BEFORE INSERT OR UPDATE ON Instructor
+FOR EACH ROW
+EXECUTE FUNCTION check_instructor_user_type();
+
+CREATE TRIGGER trg_after_exam_grades_insert
+AFTER INSERT ON Exam_grades
+FOR EACH ROW
+EXECUTE FUNCTION after_exam_grades_insert();
+
+
