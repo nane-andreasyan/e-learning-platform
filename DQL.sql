@@ -132,8 +132,8 @@ BEGIN
     RETURN QUERY
 	SELECT 
 		Exam_grades.student_id,
-	    MAX(CASE WHEN type = 'final' THEN grade END) AS final_grade,
-	    MAX(CASE WHEN type = 'midterm' THEN grade END) AS midterm_grade,
+	    	MAX(CASE WHEN type = 'final' THEN grade END) AS final_grade,
+	    	MAX(CASE WHEN type = 'midterm' THEN grade END) AS midterm_grade,
 		Enrolls.final_grade
 	FROM Exam_grades
 	INNER JOIN Exam ON Exam_grades.exam_id = Exam.exam_id
