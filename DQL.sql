@@ -3,7 +3,6 @@ DROP FUNCTION IF EXISTS view_syllabus();
 DROP FUNCTION IF EXISTS view_student_course_grades();
 DROP FUNCTION IF EXISTS view_class_grades();
 DROP FUNCTION IF EXISTS get_course_statistics();
-DROP FUNCTION IF EXISTS view_exams(); 
 DROP FUNCTION IF EXISTS update_exam_grades();
 DROP FUNCTION IF EXISTS leave_feedback();
 DROP FUNCTION IF EXISTS view_teaching_courses();
@@ -172,29 +171,6 @@ BEGIN
       AND (p_offered_year IS NULL OR e.offered_year = p_offered_year);
 END;
 $$ LANGUAGE plpgsql;
-
---View exam ids and schedule of the course 
-CREATE OR REPLACE FUNCTION view_exams(
-    p_course_id VARCHAR(255)
-)
-RETURNS TABLE(
-    exam_id INT,
-    exam_type exam_type,
-    exam_date DATE,
-	exam_time TIME
-) AS $$
-BEGIN
-    RETURN QUERY
-    SELECT 
-        e.exam_id,
-        e.type AS exam_type,
-        e.date,
-		e.time
-    FROM Exam e
-    WHERE e.course_id = p_course_id;
-END;
-$$ LANGUAGE plpgsql;
-
 
 --Update student grades 
 CREATE OR REPLACE FUNCTION update_exam_grades(
